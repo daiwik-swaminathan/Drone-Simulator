@@ -1,7 +1,6 @@
 from flask import Flask, render_template, jsonify, redirect, url_for, request
 from cassandra.cluster import Cluster
 from threading import Thread
-import threading
 import time
 import base64
 import os
@@ -9,7 +8,6 @@ import uuid
 
 # Cassandra local configuration
 KEYSPACE = "iotdatabase"
-TABLE_NAME = "imagecollection"
 
 app = Flask(__name__)
 
@@ -25,31 +23,49 @@ def setup_cassandra_connection():
 
     return session
 
+# Function to dynamically get the table name based on drone ID
+def get_table_name(system_id):
+    return f"drone_{system_id}"
+
 def poll_cassandra():
     global responseDict
     session = setup_cassandra_connection()
     
     while True:
-        # Query all rows from the image collection
-        rows = session.execute(f"SELECT * FROM {TABLE_NAME}")
+        responseDict = {}  # Reset the dictionary for each poll cycle
         
-        # Initialize a variable to store the most recent image
-        most_recent_image = None
+        # Loop through each drone's table
+        for drone_id in range(3):  # Assuming 3 drones, adjust as necessary
+            table_name = f"drone_{drone_id}"
+            
+            try:
+                # Query all rows from the current drone's table
+                rows = session.execute(f"SELECT * FROM {table_name}")
+                
+                # Initialize a variable to store the most recent image
+                most_recent_image = None
+                
+                for row in rows:
+                    # Compare timestamps to find the most recent image
+                    if not most_recent_image or row.timestamp > most_recent_image['timestamp']:
+                        most_recent_image = {
+                            "id": str(row.id),
+                            "system_id": row.system_id,
+                            "timestamp": row.timestamp,
+                            "image_data": row.image_data
+                        }
+                
+                # If a most recent image was found, add it to responseDict
+                if most_recent_image:
+                    responseDict[drone_id] = most_recent_image
+                else:
+                    print(f"No data found for {table_name}")
+
+            except Exception as e:
+                print(f"Error querying {table_name}: {str(e)}")
         
-        for row in rows:
-            # Compare timestamps to find the most recent image
-            if not most_recent_image or row.timestamp > most_recent_image['timestamp']:
-                most_recent_image = {
-                    "id": str(row.id),
-                    "system_id": row.system_id,
-                    "timestamp": row.timestamp,
-                    "image_data": row.image_data
-                }
-        
-        # Update responseDict to hold only the most recent image
-        responseDict = [most_recent_image] if most_recent_image else []
-        
-        time.sleep(2)  # Poll every 5 seconds
+        time.sleep(5)  # Poll every 2 seconds
+
 
 
 @app.route('/')
@@ -60,15 +76,15 @@ def index():
 @app.route('/get_images', methods=['POST'])
 def get_images():
     image_urls = []
-    
-    for image_data in responseDict:  # Assuming responseDict has the images
-        image_content = base64.b64decode(image_data['image_data'])
+
+    for drone_id, image_data in responseDict.items():  # Iterate over items in responseDict
+        image_content = base64.b64decode(image_data['image_data'])  # Access image_data correctly
         image_path = f"static/images/{image_data['system_id']}.jpeg"
-        
+
         # Save the image (overwriting previous one)
         with open(image_path, 'wb') as image_file:
             image_file.write(image_content)
-        
+
         # Build the URL for the image with a cache-busting query parameter
         timestamp = int(time.time())  # This adds a unique query param each time
         image_url = url_for('static', filename=f"images/{image_data['system_id']}.jpeg", _external=True) + f"?t={timestamp}"
@@ -83,17 +99,18 @@ def remove_sensor():
 
     if not sensor_id:
         return "Sensor ID is required", 400
-    
+
     try:
         session = setup_cassandra_connection()
-        
-        # Remove the sensor from Cassandra by system_id
-        session.execute(f"DELETE FROM {TABLE_NAME} WHERE system_id = %s", [int(sensor_id)])
-        
+        table_name = get_table_name(sensor_id)
+
+        # Remove the sensor from the specific drone's table
+        session.execute(f"DELETE FROM {table_name} WHERE system_id = %s", [int(sensor_id)])
+
         # Refresh the data
-        rows = session.execute(f"SELECT * FROM {TABLE_NAME}")
+        rows = session.execute(f"SELECT * FROM {table_name}")
         responseDict = [{ "id": str(row.id), "system_id": row.system_id, "timestamp": row.timestamp, "image_data": row.image_data } for row in rows]
-        
+
         return redirect(url_for('index'))
     except Exception as e:
         print(f"Failed to remove sensor: {str(e)}")
@@ -104,13 +121,19 @@ def remove_all():
     global responseDict
     try:
         session = setup_cassandra_connection()
-        
-        # Remove all entries from Cassandra
-        session.execute(f"TRUNCATE {TABLE_NAME}")
-        
+
+        # Assume you know the list of drone IDs
+        drone_ids = [0, 1, 2]  # Replace with dynamic list of drones if available
+
+        for drone_id in drone_ids:
+            table_name = get_table_name(drone_id)
+
+            # Remove all entries from each drone's table
+            session.execute(f"TRUNCATE {table_name}")
+
         # Refresh the data (empty it out since we deleted everything)
         responseDict = []
-        
+
         return redirect(url_for('index'))
     except Exception as e:
         print(f"Failed to remove all sensors: {str(e)}")
@@ -122,4 +145,4 @@ if __name__ == '__main__':
     poll_thread.daemon = True  # Ensures the thread exits when the app exits
     poll_thread.start()
 
-    app.run()
+app.run(port=5001)

@@ -6,17 +6,13 @@ import json
 import random
 import uuid
 from cassandra.cluster import Cluster
+from threading import Thread
 
 # Local Cassandra configuration (no cloud)
 KEYSPACE = "iotdatabase"
-TABLE_NAME = "imagecollection"
 IMAGE_PATHS = ["sample1.jpeg", "sample2.jpeg", "sample3.jpeg"]
 
-# Check for proper argument count
-if len(sys.argv) != 2:
-    print("Usage: python3 simulator.py <IMAGE_PATH>")
-    sys.exit(1)
-
+# Function to encode the image
 def encode_image():
     selected_image = random.choice(IMAGE_PATHS)
     with open(selected_image, "rb") as image_file:
@@ -37,9 +33,15 @@ def setup_cassandra_connection():
     # Use the keyspace
     session.execute(f"USE {KEYSPACE}")
 
-    # Create the table if it doesn't exist
+    return session
+
+# Function to create a table for a specific drone
+def create_drone_table(session, system_id):
+    table_name = f"drone_{system_id}"
+    
+    # Create a new table for the drone if it doesn't exist
     session.execute(f"""
-        CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
+        CREATE TABLE IF NOT EXISTS {table_name} (
             id UUID PRIMARY KEY,
             system_id int,
             timestamp text,
@@ -47,33 +49,51 @@ def setup_cassandra_connection():
         )
     """)
 
-    return session
+    return table_name
 
-# Main function to send images every 5 seconds
-def main():
-    print("Starting Image Simulator")
+# Function representing a drone's behavior
+def drone_simulator(system_id):
+    print(f"Starting Drone {system_id}")
     
     # Initialize the Cassandra session
     session = setup_cassandra_connection()
+    
+    # Create a unique table for this drone
+    table_name = create_drone_table(session, system_id)
     
     while True:
         image_data = encode_image()
         image_message = {
             "id": uuid.uuid4(),
-            "system_id": 0,
+            "system_id": system_id,
             "timestamp": time.strftime("%m/%d/%Y %H:%M:%S"),
             "image_data": image_data
         }
         
-        # Insert the data into the local Cassandra instance
+        # Insert the data into this drone's specific table
         insert_query = f"""
-            INSERT INTO {TABLE_NAME} (id, system_id, timestamp, image_data)
+            INSERT INTO {table_name} (id, system_id, timestamp, image_data)
             VALUES (%s, %s, %s, %s)
         """
         session.execute(insert_query, (image_message["id"], image_message["system_id"], image_message["timestamp"], image_message["image_data"]))
         
-        print('Published:', image_message["timestamp"])
-        time.sleep(2)
+        print(f'Drone {system_id} Published:', image_message["timestamp"])
+        time.sleep(5)  # Send image every 2 seconds
+
+# Main function to start multiple drone threads
+def main():
+    num_drones = 3  # Adjust this number to simulate more or fewer drones
+    
+    threads = []
+    for i in range(num_drones):
+        # Create and start a thread for each drone, passing its system_id
+        t = Thread(target=drone_simulator, args=(i,))
+        t.start()
+        threads.append(t)
+    
+    # Keep the main thread alive to prevent the program from exiting
+    for t in threads:
+        t.join()
 
 if __name__ == "__main__":
     main()

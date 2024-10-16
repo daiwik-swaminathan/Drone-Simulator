@@ -9,6 +9,7 @@
         <table id="imageTable" class="json-table table" style="width: 95%; margin-left: 2.5%;">
             <thead>
                 <tr>
+                    <th scope="col">Drone ID</th>
                     <th scope="col">Image</th>
                     <th scope="col">Timestamp</th>
                     <th scope="col">Actions</th>
@@ -39,9 +40,13 @@
             var tableBody = $('#imageTable tbody');
             tableBody.empty();  // Clear the table body before updating
             
-            if (data.length > 0) {
-                var latestImage = data[0]; // Only get the first image
+            // Loop through the data for each drone
+            for (var drone_id in data) {
+                var latestImage = data[drone_id];
                 var row = $('<tr></tr>');
+
+                // Add the Drone ID column
+                row.append($('<td></td>').text(drone_id));
 
                 // Add the image column with the image URL
                 var imageCell = $('<td></td>');
@@ -70,7 +75,7 @@
 
         // Fetch image data initially and then refresh every 5 seconds
         fetchImages();
-        setInterval(fetchImages, 2000);  // 5000 milliseconds = 5 seconds
+        setInterval(fetchImages, 5000);  // Refresh every 5 seconds
     </script>
 </body>
 </html>
