@@ -51,8 +51,13 @@ def create_drone_table(session, system_id):
 
     return table_name
 
+# Function to clear all entries from a drone table
+def clear_drone_table(session, table_name):
+    session.execute(f"TRUNCATE {table_name}")
+    print(f"Cleared all entries from {table_name}")
+
 # Function representing a drone's behavior
-def drone_simulator(system_id):
+def drone_simulator(system_id, end_time):
     print(f"Starting Drone {system_id}")
     
     # Initialize the Cassandra session
@@ -61,7 +66,10 @@ def drone_simulator(system_id):
     # Create a unique table for this drone
     table_name = create_drone_table(session, system_id)
     
-    while True:
+    # Clear all entries in the table before sending images
+    clear_drone_table(session, table_name)
+    
+    while time.time() < end_time:
         image_data = encode_image()
         image_message = {
             "id": uuid.uuid4(),
@@ -78,20 +86,25 @@ def drone_simulator(system_id):
         session.execute(insert_query, (image_message["id"], image_message["system_id"], image_message["timestamp"], image_message["image_data"]))
         
         print(f'Drone {system_id} Published:', image_message["timestamp"])
-        time.sleep(5)  # Send image every 2 seconds
+        
+        time.sleep(5)  # Send image every 5 seconds
+
+    print(f"Drone {system_id} has completed its task.")
 
 # Main function to start multiple drone threads
 def main():
-    num_drones = 3  # Adjust this number to simulate more or fewer drones
+    num_drones = 1  # Adjust this number to simulate more or fewer drones
+    simulation_duration = 10  # Duration of the simulation in seconds (1 minute)
+    end_time = time.time() + simulation_duration  # Calculate the end time
     
     threads = []
     for i in range(num_drones):
-        # Create and start a thread for each drone, passing its system_id
-        t = Thread(target=drone_simulator, args=(i,))
+        # Create and start a thread for each drone, passing its system_id and end_time
+        t = Thread(target=drone_simulator, args=(i, end_time))
         t.start()
         threads.append(t)
     
-    # Keep the main thread alive to prevent the program from exiting
+    # Wait for all drone threads to finish
     for t in threads:
         t.join()
 
