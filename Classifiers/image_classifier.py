@@ -24,7 +24,7 @@ transform_pipeline = transforms.Compose([
 
 # Set up a connection to the local Cassandra instance
 def setup_cassandra_connection():
-    cluster = Cluster(['127.0.0.1'])  
+    cluster = Cluster(['35.90.243.100'], port=9042)  
     session = cluster.connect()
     session.execute(f"USE {KEYSPACE}")
     return session
@@ -62,9 +62,9 @@ def classify_all_images_after_delay():
             # Classify each image in the table
             for row in rows:
                 # Record CPU and memory usage
-                cpu_util = psutil.cpu_percent(interval=None)  # get CPU utilization in %
+                cpu_util_per_core = psutil.cpu_percent(interval=None, percpu=True)  # get per-core CPU utilization in %
                 mem_util = psutil.virtual_memory().percent    # get memory utilization in %
-                cpu_utilizations.append(cpu_util)
+                cpu_utilizations.append(cpu_util_per_core)
                 memory_utilizations.append(mem_util)
                 
                 classification_label = classify_image(row.image_data)
@@ -82,10 +82,14 @@ def classify_all_images_after_delay():
     print(f"Total classification time (Response Time): {elapsed_time:.2f} seconds")
     
     # Calculate and print average CPU and memory utilization
-    avg_cpu_util = sum(cpu_utilizations) / len(cpu_utilizations) if cpu_utilizations else 0
+    avg_cpu_util = [sum(core) / len(core) for core in zip(*cpu_utilizations)]  # average per-core usage
     avg_memory_util = sum(memory_utilizations) / len(memory_utilizations) if memory_utilizations else 0
-    print(f"Average CPU Utilization: {avg_cpu_util:.2f}%")
+
+    # Print average CPU usage for each core
+    for i, core_avg in enumerate(avg_cpu_util):
+        print(f"Average CPU Utilization for Core {i}: {core_avg:.2f}%")
     print(f"Average Memory Utilization: {avg_memory_util:.2f}%")
 
 if __name__ == "__main__":
     classify_all_images_after_delay()
+
