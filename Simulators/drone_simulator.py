@@ -21,7 +21,7 @@ def encode_image():
 # Set up a connection to the local Cassandra instance
 def setup_cassandra_connection():
     # Connect to the local Cassandra instance
-    cluster = Cluster(['127.0.0.1'])  # Localhost (no Docker)
+    cluster = Cluster(['35.91.168.12'], port=9042)
     session = cluster.connect()
 
     # Create the keyspace if it doesn't exist
@@ -87,14 +87,14 @@ def drone_simulator(system_id, end_time):
         
         print(f'Drone {system_id} Published:', image_message["timestamp"])
         
-        time.sleep(5)  # Send image every 5 seconds
+        time.sleep(2)  # Send image every 5 seconds
 
     print(f"Drone {system_id} has completed its task.")
 
 # Main function to start multiple drone threads
 def main():
-    num_drones = 1  # Adjust this number to simulate more or fewer drones
-    simulation_duration = 10  # Duration of the simulation in seconds (1 minute)
+    num_drones = 40  # Adjust this number to simulate more or fewer drones
+    simulation_duration = 60  # Duration of the simulation in seconds (1 minute)
     end_time = time.time() + simulation_duration  # Calculate the end time
     
     threads = []
