@@ -47,10 +47,12 @@ def classify_all_images_after_delay():
     
     print("Starting classification of all images in each drone table.")
 
-    # Start timing
-    start_time = time.time()
+    response_times = []  # List to store the response time for each drone table
     cpu_utilizations = []
     memory_utilizations = []
+
+    # Universal start time
+    universal_start_time = time.time()
 
     for drone_id in range(NUM_DRONES):
         table_name = f"drone_{drone_id}"
@@ -58,6 +60,9 @@ def classify_all_images_after_delay():
         try:
             # Query all rows from the current drone's table
             rows = session.execute(f"SELECT * FROM {table_name}")
+            
+            # Start timing for this table
+            table_start_time = time.time()
             
             # Classify each image in the table
             for row in rows:
@@ -72,14 +77,23 @@ def classify_all_images_after_delay():
                 category_name = ResNet50_Weights.DEFAULT.meta["categories"][classification_label]
 
                 print(f"Drone {drone_id} - Image ID {row.id} classified as: {category_name}")
+            
+            # End timing for this table
+            table_end_time = time.time()
+            elapsed_time = table_end_time - universal_start_time  # Use universal start time
+            response_times.append(elapsed_time)  # Store response time for this table
+            
+            print(f"Response time for {table_name}: {elapsed_time:.2f} seconds")
                 
         except Exception as e:
             print(f"Error querying {table_name}: {str(e)}")
     
-    # End timing and print elapsed time
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print(f"Total classification time (Response Time): {elapsed_time:.2f} seconds")
+    # Calculate average response time
+    if response_times:
+        avg_response_time = sum(response_times) / len(response_times)
+        print(f"Average Response Time across all drone tables: {avg_response_time:.2f} seconds")
+    else:
+        print("No response times recorded.")
     
     # Calculate and print average CPU and memory utilization
     avg_cpu_util = [sum(core) / len(core) for core in zip(*cpu_utilizations)]  # average per-core usage
