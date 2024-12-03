@@ -9,7 +9,7 @@ from io import BytesIO
 import psutil  # For CPU and memory monitoring
 
 KEYSPACE = "iotdatabase"
-NUM_DRONES = 1
+NUM_DRONES = 30
 
 # Load pre-trained ResNet model for image classification
 model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
@@ -24,7 +24,7 @@ transform_pipeline = transforms.Compose([
 
 # Set up a connection to the local Cassandra instance
 def setup_cassandra_connection():
-    cluster = Cluster(['35.90.243.100'], port=9042)  
+    cluster = Cluster(['35.91.168.12'], port=9042)  
     session = cluster.connect()
     session.execute(f"USE {KEYSPACE}")
     return session
@@ -42,6 +42,9 @@ def classify_image(encoded_data):
     return predicted.item()  
 
 # Classify all images from each drone table after 30 seconds, and measure CPU/memory utilization
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# Classify all images from each drone table after 30 seconds, and measure CPU/memory utilization
 def classify_all_images_after_delay():
     session = setup_cassandra_connection()
     
@@ -54,9 +57,8 @@ def classify_all_images_after_delay():
     # Universal start time
     universal_start_time = time.time()
 
-    for drone_id in range(NUM_DRONES):
+    def process_table(drone_id):
         table_name = f"drone_{drone_id}"
-        
         try:
             # Query all rows from the current drone's table
             rows = session.execute(f"SELECT * FROM {table_name}")
@@ -68,26 +70,34 @@ def classify_all_images_after_delay():
             for row in rows:
                 # Record CPU and memory usage
                 cpu_util_per_core = psutil.cpu_percent(interval=None, percpu=True)  # get per-core CPU utilization in %
-                mem_util = psutil.virtual_memory().percent    # get memory utilization in %
+                mem_util = psutil.virtual_memory().percent  # get memory utilization in %
                 cpu_utilizations.append(cpu_util_per_core)
                 memory_utilizations.append(mem_util)
                 
                 classification_label = classify_image(row.image_data)
                 # Print the category name for each classified image
                 category_name = ResNet50_Weights.DEFAULT.meta["categories"][classification_label]
-
                 print(f"Drone {drone_id} - Image ID {row.id} classified as: {category_name}")
             
             # End timing for this table
             table_end_time = time.time()
             elapsed_time = table_end_time - universal_start_time  # Use universal start time
-            response_times.append(elapsed_time)  # Store response time for this table
-            
             print(f"Response time for {table_name}: {elapsed_time:.2f} seconds")
-                
+            return elapsed_time  # Return response time for this table
+
         except Exception as e:
             print(f"Error querying {table_name}: {str(e)}")
-    
+            return None
+
+    # Use ThreadPoolExecutor to process tables concurrently
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_to_drone = {executor.submit(process_table, drone_id): drone_id for drone_id in range(NUM_DRONES)}
+
+        for future in as_completed(future_to_drone):
+            elapsed_time = future.result()
+            if elapsed_time is not None:
+                response_times.append(elapsed_time)
+
     # Calculate average response time
     if response_times:
         avg_response_time = sum(response_times) / len(response_times)
