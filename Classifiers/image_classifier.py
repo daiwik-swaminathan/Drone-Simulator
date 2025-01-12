@@ -2,18 +2,25 @@ import base64
 import time
 import torch
 from torchvision import models, transforms
-from torchvision.models import ResNet50_Weights
+# from torchvision.models import ResNet50_Weights
+# from torchvision.models import ResNet18_Weights, resnet18
+# from torchvision.models import mobilenet_v2, MobileNet_V2_Weights
+from efficientnet_pytorch import EfficientNet
 from cassandra.cluster import Cluster
 from PIL import Image
 from io import BytesIO
 import psutil  # For CPU and memory monitoring
 
 KEYSPACE = "iotdatabase"
-NUM_DRONES = 30
+NUM_DRONES = 5
 
 # Load pre-trained ResNet model for image classification
-model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
-model.eval()  
+# model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
+# model = resnet18(weights=ResNet18_Weights.DEFAULT)
+# model = mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT)
+# model = models.shufflenet_v2_x1_0(pretrained=True)
+model = EfficientNet.from_pretrained('efficientnet-b0')
+model.eval()
 
 # Define transformation pipeline for image
 transform_pipeline = transforms.Compose([
@@ -24,7 +31,7 @@ transform_pipeline = transforms.Compose([
 
 # Set up a connection to the local Cassandra instance
 def setup_cassandra_connection():
-    cluster = Cluster(['35.91.168.12'], port=9042)  
+    cluster = Cluster(['35.91.77.33'], port=9042)
     session = cluster.connect()
     session.execute(f"USE {KEYSPACE}")
     return session
@@ -39,7 +46,7 @@ def classify_image(encoded_data):
     with torch.no_grad():
         outputs = model(image_tensor)
     _, predicted = outputs.max(1)
-    return predicted.item()  
+    return predicted.item()
 
 # Classify all images from each drone table after 30 seconds, and measure CPU/memory utilization
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -47,7 +54,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # Classify all images from each drone table after 30 seconds, and measure CPU/memory utilization
 def classify_all_images_after_delay():
     session = setup_cassandra_connection()
-    
+
     print("Starting classification of all images in each drone table.")
 
     response_times = []  # List to store the response time for each drone table
@@ -62,10 +69,10 @@ def classify_all_images_after_delay():
         try:
             # Query all rows from the current drone's table
             rows = session.execute(f"SELECT * FROM {table_name}")
-            
+
             # Start timing for this table
             table_start_time = time.time()
-            
+
             # Classify each image in the table
             for row in rows:
                 # Record CPU and memory usage
@@ -73,12 +80,16 @@ def classify_all_images_after_delay():
                 mem_util = psutil.virtual_memory().percent  # get memory utilization in %
                 cpu_utilizations.append(cpu_util_per_core)
                 memory_utilizations.append(mem_util)
-                
+
                 classification_label = classify_image(row.image_data)
                 # Print the category name for each classified image
-                category_name = ResNet50_Weights.DEFAULT.meta["categories"][classification_label]
-                print(f"Drone {drone_id} - Image ID {row.id} classified as: {category_name}")
-            
+                # category_name = ResNet50_Weights.DEFAULT.meta["categories"][classification_label]
+                # category_name = ResNet18_Weights.DEFAULT.meta["categories"][classification_label]
+                # category_name = MobileNet_V2_Weights.DEFAULT.meta["categories"][classification_label]
+                # category_name = models.shufflenet_v2_x1_0().meta["categories"][classification_label]
+                # category_name = EfficientNet._ALLOWED_MODELS['efficientnet-lite0'].meta["categories"][classification_label]
+                # print(f"Drone {drone_id} - Image ID {row.id} classified as: {category_name}")
+
             # End timing for this table
             table_end_time = time.time()
             elapsed_time = table_end_time - universal_start_time  # Use universal start time
@@ -104,7 +115,7 @@ def classify_all_images_after_delay():
         print(f"Average Response Time across all drone tables: {avg_response_time:.2f} seconds")
     else:
         print("No response times recorded.")
-    
+
     # Calculate and print average CPU and memory utilization
     avg_cpu_util = [sum(core) / len(core) for core in zip(*cpu_utilizations)]  # average per-core usage
     avg_memory_util = sum(memory_utilizations) / len(memory_utilizations) if memory_utilizations else 0
@@ -116,4 +127,3 @@ def classify_all_images_after_delay():
 
 if __name__ == "__main__":
     classify_all_images_after_delay()
-
