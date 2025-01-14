@@ -4,8 +4,8 @@ import torch
 from torchvision import models, transforms
 # from torchvision.models import ResNet50_Weights
 # from torchvision.models import ResNet18_Weights, resnet18
-# from torchvision.models import mobilenet_v2, MobileNet_V2_Weights
-from efficientnet_pytorch import EfficientNet
+from torchvision.models import mobilenet_v2, MobileNet_V2_Weights
+# from efficientnet_pytorch import EfficientNet
 from cassandra.cluster import Cluster
 from PIL import Image
 from io import BytesIO
@@ -88,7 +88,7 @@ def classify_all_images_after_delay():
                 category_name = MobileNet_V2_Weights.DEFAULT.meta["categories"][classification_label]
                 # category_name = models.shufflenet_v2_x1_0().meta["categories"][classification_label]
                 # category_name = EfficientNet._ALLOWED_MODELS['efficientnet-lite0'].meta["categories"][classification_label]
-                # print(f"Drone {drone_id} - Image ID {row.id} classified as: {category_name}")
+                print(f"Drone {drone_id} - Image ID {row.id} classified as: {category_name}")
 
             # End timing for this table
             table_end_time = time.time()
