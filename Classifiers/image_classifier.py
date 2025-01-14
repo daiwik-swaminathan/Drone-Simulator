@@ -17,9 +17,9 @@ NUM_DRONES = 5
 # Load pre-trained ResNet model for image classification
 # model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
 # model = resnet18(weights=ResNet18_Weights.DEFAULT)
-# model = mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT)
+model = mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT)
 # model = models.shufflenet_v2_x1_0(pretrained=True)
-model = EfficientNet.from_pretrained('efficientnet-b0')
+# model = EfficientNet.from_pretrained('efficientnet-b0')
 model.eval()
 
 # Define transformation pipeline for image
@@ -85,7 +85,7 @@ def classify_all_images_after_delay():
                 # Print the category name for each classified image
                 # category_name = ResNet50_Weights.DEFAULT.meta["categories"][classification_label]
                 # category_name = ResNet18_Weights.DEFAULT.meta["categories"][classification_label]
-                # category_name = MobileNet_V2_Weights.DEFAULT.meta["categories"][classification_label]
+                category_name = MobileNet_V2_Weights.DEFAULT.meta["categories"][classification_label]
                 # category_name = models.shufflenet_v2_x1_0().meta["categories"][classification_label]
                 # category_name = EfficientNet._ALLOWED_MODELS['efficientnet-lite0'].meta["categories"][classification_label]
                 # print(f"Drone {drone_id} - Image ID {row.id} classified as: {category_name}")
