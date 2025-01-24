@@ -1,42 +1,35 @@
 import base64
 import time
 import torch
-from torchvision import models, transforms
-# from torchvision.models import ResNet50_Weights
-# from torchvision.models import ResNet18_Weights, resnet18
 from torchvision.models import mobilenet_v2, MobileNet_V2_Weights
-# from efficientnet_pytorch import EfficientNet
+from torchvision import transforms
 from cassandra.cluster import Cluster
 from PIL import Image
 from io import BytesIO
-import psutil  # For CPU and memory monitoring
+from flask import Flask, request, jsonify
+# import psutil
 
 KEYSPACE = "iotdatabase"
-NUM_DRONES = 5
 
-# Load pre-trained ResNet model for image classification
-# model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
-# model = resnet18(weights=ResNet18_Weights.DEFAULT)
+# Load pre-trained MobileNet model for image classification
 model = mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT)
-# model = models.shufflenet_v2_x1_0(pretrained=True)
-# model = EfficientNet.from_pretrained('efficientnet-b0')
 model.eval()
 
-# Define transformation pipeline for image
+# Define transformation pipeline for images
 transform_pipeline = transforms.Compose([
     transforms.Resize((224, 224)),  # Resize to model's input size
     transforms.ToTensor(),  # Convert to tensor
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])  # Normalization
 ])
 
-# Set up a connection to the local Cassandra instance
+# Set up Cassandra connection
 def setup_cassandra_connection():
-    cluster = Cluster(['35.91.77.33'], port=9042)
+    cluster = Cluster(['54.202.118.142'], port=9042)
     session = cluster.connect()
     session.execute(f"USE {KEYSPACE}")
     return session
 
-# Decode and classify the image
+# Decode and classify a single image
 def classify_image(encoded_data):
     image_data = base64.b64decode(encoded_data)
     image = Image.open(BytesIO(image_data)).convert("RGB")
@@ -48,82 +41,85 @@ def classify_image(encoded_data):
     _, predicted = outputs.max(1)
     return predicted.item()
 
-# Classify all images from each drone table after 30 seconds, and measure CPU/memory utilization
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-# Classify all images from each drone table after 30 seconds, and measure CPU/memory utilization
-def classify_all_images_after_delay():
+# Process a single drone table
+def process_table(table_name):
     session = setup_cassandra_connection()
+    try:
+        print(f"Processing table: {table_name}")
+        rows = session.execute(f"SELECT * FROM {table_name}")
+        # cpu_utilizations = []
+        # memory_utilizations = []
 
-    print("Starting classification of all images in each drone table.")
+        for row in rows:
+            # Record CPU and memory usage
+            # cpu_util_per_core = psutil.cpu_percent(interval=None, percpu=True)
+            # mem_util = psutil.virtual_memory().percent
+            # cpu_utilizations.append(cpu_util_per_core)
+            # memory_utilizations.append(mem_util)
 
-    response_times = []  # List to store the response time for each drone table
-    cpu_utilizations = []
-    memory_utilizations = []
+            classification_label = classify_image(row.image_data)
+            category_name = MobileNet_V2_Weights.DEFAULT.meta["categories"][classification_label]
+            print(f"Image ID {row.id} classified as: {category_name}")
 
-    # Universal start time
-    universal_start_time = time.time()
+        # Calculate average CPU and memory utilization
+        # avg_cpu_util = [sum(core) / len(core) for core in zip(*cpu_utilizations)]
+        # avg_memory_util = sum(memory_utilizations) / len(memory_utilizations) if memory_utilizations else 0
 
-    def process_table(drone_id):
-        table_name = f"drone_{drone_id}"
-        try:
-            # Query all rows from the current drone's table
-            rows = session.execute(f"SELECT * FROM {table_name}")
+        return {
+            "status": "success"
+            # "avg_cpu_util": avg_cpu_util,
+            # "avg_memory_util": avg_memory_util,
+        }
 
-            # Start timing for this table
-            table_start_time = time.time()
+    except Exception as e:
+        print(f"Error processing table {table_name}: {str(e)}")
+        return {"status": "error", "message": str(e)}
 
-            # Classify each image in the table
-            for row in rows:
-                # Record CPU and memory usage
-                cpu_util_per_core = psutil.cpu_percent(interval=None, percpu=True)  # get per-core CPU utilization in %
-                mem_util = psutil.virtual_memory().percent  # get memory utilization in %
-                cpu_utilizations.append(cpu_util_per_core)
-                memory_utilizations.append(mem_util)
+# Flask server to handle incoming requests
+app = Flask(__name__)
 
-                classification_label = classify_image(row.image_data)
-                # Print the category name for each classified image
-                # category_name = ResNet50_Weights.DEFAULT.meta["categories"][classification_label]
-                # category_name = ResNet18_Weights.DEFAULT.meta["categories"][classification_label]
-                category_name = MobileNet_V2_Weights.DEFAULT.meta["categories"][classification_label]
-                # category_name = models.shufflenet_v2_x1_0().meta["categories"][classification_label]
-                # category_name = EfficientNet._ALLOWED_MODELS['efficientnet-lite0'].meta["categories"][classification_label]
-                print(f"Drone {drone_id} - Image ID {row.id} classified as: {category_name}")
+'''
+@app.route("/classify", methods=["POST"])
+def classify():
+    print("enter classify")
+    data = request.json
+    if not data or "table_name" not in data:
+        return jsonify({"status": "error", "message": "Table name is required"}), 400
 
-            # End timing for this table
-            table_end_time = time.time()
-            elapsed_time = table_end_time - universal_start_time  # Use universal start time
-            print(f"Response time for {table_name}: {elapsed_time:.2f} seconds")
-            return elapsed_time  # Return response time for this table
+    table_name = data["table_name"]
+    result = process_table(table_name)
+    return jsonify(result)
+'''
 
-        except Exception as e:
-            print(f"Error querying {table_name}: {str(e)}")
-            return None
+import time
 
-    # Use ThreadPoolExecutor to process tables concurrently
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        future_to_drone = {executor.submit(process_table, drone_id): drone_id for drone_id in range(NUM_DRONES)}
+@app.route("/classify", methods=["POST"])
+def classify():
+    start_time = time.time()  # Record start time
+    timestamp_start = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(start_time))
+    print(f"Classification started at {timestamp_start}")
 
-        for future in as_completed(future_to_drone):
-            elapsed_time = future.result()
-            if elapsed_time is not None:
-                response_times.append(elapsed_time)
+    data = request.json
+    if not data or "table_name" not in data:
+        return jsonify({"status": "error", "message": "Table name is required"}), 400
 
-    # Calculate average response time
-    if response_times:
-        avg_response_time = sum(response_times) / len(response_times)
-        print(f"Average Response Time across all drone tables: {avg_response_time:.2f} seconds")
-    else:
-        print("No response times recorded.")
+    table_name = data["table_name"]
+    result = process_table(table_name)  # Your existing classification function
 
-    # Calculate and print average CPU and memory utilization
-    avg_cpu_util = [sum(core) / len(core) for core in zip(*cpu_utilizations)]  # average per-core usage
-    avg_memory_util = sum(memory_utilizations) / len(memory_utilizations) if memory_utilizations else 0
+    end_time = time.time()  # Record end time
+    timestamp_end = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(end_time))
+    print(f"Classification ended at {timestamp_end}")
+    return jsonify(result)
 
-    # Print average CPU usage for each core
-    for i, core_avg in enumerate(avg_cpu_util):
-        print(f"Average CPU Utilization for Core {i}: {core_avg:.2f}%")
-    print(f"Average Memory Utilization: {avg_memory_util:.2f}%")
+'''
+@app.route('/health')
+def health_check():
+    # Get CPU utilization
+    cpu_utilization = psutil.cpu_percent(interval=None)
+    return jsonify({"cpu_utilization": cpu_utilization})
+'''
 
 if __name__ == "__main__":
-    classify_all_images_after_delay()
+    # Start the Flask server and listen for incoming HAProxy requests
+    app.run(host="0.0.0.0", port=5000)
+
