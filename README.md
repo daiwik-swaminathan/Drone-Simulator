@@ -45,10 +45,30 @@ This project simulates a fog computing system with distributed image classificat
 
 ## Setup Instructions
 ### Prerequisites
-- AWS EC2 instances set up with necessary security group rules.
-- Docker and Python installed on relevant instances.
 
-### Step 1: Setting Up Cassandra on EC2-2
+### Step 1: Spin up the AWS EC2 instances
+- All of these will use the Ubuntu OS
+- 2 of them are to be T2.large instances (WorkloadGenerator and Database, respectively). The 3rd one (Classifier instance) is to be m7a.xlarge (4 physical cores).
+- Make sure to have relaxed security group rules (i.e. allow all incoming traffic).
+
+### Step 2: Configure the WorkloadGenerator instance (EC2-1)
+
+Run the following commands:
+
+```bash
+# Updates package lists and upgrades all installed packages automatically
+sudo apt update && sudo apt upgrade -y
+```
+
+```bash
+# Install necessary packages like git, virtual python env, and pip
+sudo apt install -y git python3-venv python3-pip
+```
+
+```bash
+# Clone the repo
+```
+
 ```bash
 # Install and run Cassandra in Docker
 sudo docker run --name cassandra-db -d cassandra
