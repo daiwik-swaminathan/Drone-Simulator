@@ -1,7 +1,7 @@
-# Distributed Image Classification System
+# Fog Computing System Simulation for Smart Warehouse Environment
 
 ## Overview
-This project simulates a distributed image classification system using AWS EC2 instances, Docker, Cassandra, HAProxy, and Flask. The system consists of three EC2 instances:
+This project simulates a fog computing system with distributed image classification using AWS EC2 instances, Docker, Cassandra, and HAProxy. The system consists of three EC2 instances:
 
 1. **Workload Generator (EC2-1)**: Simulates drones sending image data.
 2. **Database & Load Balancer (EC2-2)**: Hosts a Cassandra database, HAProxy, and a script for forwarding classification requests.
