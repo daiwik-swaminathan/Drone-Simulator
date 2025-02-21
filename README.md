@@ -67,6 +67,13 @@ sudo apt install -y git python3-venv python3-pip
 
 ```bash
 # Clone the repo
+git clone https://github.com/daiwik-swaminathan/Drone-Simulator.git
+```
+
+```bash
+# Set up Python virtual environment and enter it
+python3 -m venv venv
+source venv/bin/activate
 ```
 
 ```bash
