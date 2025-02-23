@@ -152,6 +152,75 @@ sudo systemctl restart haproxy
 sudo systemctl status haproxy
 ```
 
+#### Python Virtual Environment
+
+```bash
+# Install packages needed to start a python virtual env
+sudo apt install -y python3-venv python3-pip
+```
+
+```bash
+# Create virtual env (this should be in the root directory of the Database instance).
+python3 -m venv venv
+```
+
+```bash
+# Install the requests library (to be used by the push_to_haproxy.py script):
+pip install requests
+```
+
+#### push_to_haproxy.py
+
+In the root directory of the Database instance, add this script called `push_to_haproxy.py`:
+
+```python
+import requests
+import threading
+import time
+
+NUM_DRONES = 1  # Number of drones
+HAPROXY_URL = 'http://127.0.0.1:8080/classify'  # Replace with HAProxy IP/port
+
+def send_request(drone_id):
+    table_name = f"drone_{drone_id}"
+    print(f"Drone {drone_id} is starting to send table {table_name}...")  # Print statement at the start
+
+    start_time = time.time()  # Start the timer for this request
+    response = requests.post(
+        HAPROXY_URL,
+        json={"table_name": table_name}
+    )
+    end_time = time.time()  # End the timer for this request
+
+    elapsed_time = end_time - start_time  # Calculate elapsed time
+    print(f"Drone {drone_id} sent table {table_name}, response: {response.status_code}, time taken: {elapsed_time:.2f} seconds")
+
+def send_to_haproxy():
+    start_time = time.time()  # Start the timer
+    threads = []
+
+    for i in range(NUM_DRONES):  # Launch one thread per drone
+        thread = threading.Thread(target=send_request, args=(i,))
+        threads.append(thread)
+        thread.start()
+
+    for thread in threads:  # Wait for all threads to complete
+        thread.join()
+
+    end_time = time.time()  # End the timer
+    elapsed_time = end_time - start_time
+    print(f"Total time taken to process all requests: {elapsed_time:.2f} seconds")
+
+if __name__ == "__main__":
+    send_to_haproxy()
+```
+
+Give executable perms to this script:
+
+```bash
+chmod +x push_to_haproxy.sh
+```
+
 ### Step 3: Configure the WorkloadGenerator instance (EC2-1)
 
 Run the following commands:
@@ -210,8 +279,18 @@ sudo apt update && sudo apt upgrade -y
 ```
 
 ```bash
-# Install necessary packages like git, virtual python env, and pip
+# Install git
 sudo apt install -y git
+```
+
+```bash
+# Install collectl
+sudo apt install collectl
+```
+
+```bash
+# Verify collectl installation
+collectl --version
 ```
 
 ```bash
@@ -233,6 +312,8 @@ sudo systemctl status docker
 
 You should see output that shows Docker is active and running. Press q to exit the status screen.
 
+#### Building our own docker container
+
 We need to build our own docker containers that run the image classifier script:
 
 ```bash
@@ -249,6 +330,12 @@ Modify the image classifier script (line 27) to use the IP address of the databa
 
 ```bash
 vi image_classifier.py
+```
+
+Give executable perms to `image_classifier,py`:
+
+```bash
+chmod +x image_classifier.py
 ```
 
 ```bash
@@ -297,4 +384,44 @@ Give executable perms to the above script:
 chmod +x run_containers.sh
 ```
 
-This script will start (not create) the classifier containers. To see more about when/how to use this script, see the section later.
+This script will start (not create) the classifier containers. To see more about when/how to use this script, see step 5.
+
+### Step 5: Running Experiments
+
+#### Pre-requisites
+
+The following needs to have been done prior to any experimentation being possible:
+1) The drone_simulator.py script must have run successfully with the expected number of images sitting in each of the drone tables in cassandra. Note that for running tests, the WorkloadGenerator instance does not need to be active.
+2) The Database instance is active and has both cassandra and HAProxy running (ensure HAProxy's config file has the right IP of the Classifier instance and has been restarted).
+3) The Classifier instance has 5 containers that are currently stopped (not actively running nor removed). I.e if you run `sudo docker ps`, nothing should show up.
+4) The Classifier instance should have the script `run_containers.sh` in its root directory.
+5) The Database instance should have a Python virtual environment ready to use.
+6) The Database instance should have the script `push_to_haproxy.py` in its root directory.
+
+#### Setup
+
+You will need 3 terminals open:
+1) One for running collectl on the Classifier instance (Terminal A)
+2) One for starting and stopping the classifier containers on the Classifier instance (Terminal B)
+3) One for modifying push_to_haproxy.py and /etc/haproxy/haproxy.cfg on the Database instance (Terminal C)
+
+#### Sample test walkthrough
+
+Suppose you would like to run a test with 1 classifer container running. Here are the steps you would need to do:
+
+1) Start the Python virtual environment in the Database instance via this command: `source venv/bin/activate`.
+2) Modify the `NUM_CONTAINERS` constant at the top of the `run_containers.sh` script to `1`. Recall this script lives in the Classifier instance.
+3) Modify the `NUM_DRONES` constant at the top of the `push_to_haproxy.py` script to `1`.
+4) Open `/etc/haproxy/haproxy.cfg` in the Database instance and ensure only worker1 is active (worker2 ... worker5 should be commented out).
+5) Run `sudo systemctl restart haproxy` in the Database instance.
+6) Run `collectl -sCD` on the Classifer instance (Terminal A).
+7) Run `./run_containers` on the Classifier instance (Terminal B). You should observe a spike in CPU usage (via collectl output) due to the containers being started.
+8) When the CPU usage falls back to 0, run `python push_to_haproxy.py` in the Database instance (Terminal C). You should observe a spike in CPU usage (via collectl output) due to the containers processing the incoming workload.
+9) When `push_to_haproxy` is done, it will output the response times of each request (drone table classification).
+10) Stop the collectl command (via ctrl-c) (Terminal A).
+11) Run `sudo docker stop $(sudo docker ps -q)` in the same terminal you ran `./run_containers` (Terminal B).
+12) Note down the outputs of the collectl command and the response times. I like to copy and paste them into local files on my computer and use a local script to parse them.
+
+For subsequent tests with the same number of drones, you only need to repeat steps 6-12.
+
+For tests where you want to change the number of drones, you need to repeat steps 2-12.
