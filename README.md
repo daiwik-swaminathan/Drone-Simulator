@@ -225,3 +225,29 @@ sudo docker stop $(sudo docker ps -q)
 ```
 
 Add this script called "run_containers.sh" to the root directory of your instance:
+
+```bash
+#!/bin/bash
+
+# Number of containers to run
+NUM_CONTAINERS=1
+
+# Starting port number
+START_PORT=5000
+
+# Create and start containers
+for i in $(seq 1 $NUM_CONTAINERS); do
+    NAME="classifier$i"
+    HOST_PORT=$((START_PORT + i - 1))
+    sudo docker start "$NAME"
+    echo "Started container $NAME on port $HOST_PORT"
+done
+```
+
+Give executable perms to the above script:
+
+```bash
+chmod +x run_containers.sh
+```
+
+This script will start (not create) the classifier containers. To see more about when/how to use this script, see the section later.
