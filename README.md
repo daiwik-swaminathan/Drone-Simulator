@@ -133,6 +133,9 @@ source venv/bin/activate
 
 Modify the drone script (line 24) to use the IP address of the database instance. The drone script will not work as intended otherwise.
 Ensure that cassandra is running in the other EC2 instance. Feel free to modify the other configurations of the script to vary the workload.
+For example, to get 400 images to be in every table, you could modify the sleep statement on line 90 to be 3 seconds and modify the 
+simulation_duration variable on line 97 to be 1200 (seconds). This way, there will be 20 images put into every table every 1 minute. The script
+would run for a total of 20 minutes. Thus, 20 images per min and running for 20 min will end up having 400 images per table in the end.
 
 ```bash
 cd Simulators
