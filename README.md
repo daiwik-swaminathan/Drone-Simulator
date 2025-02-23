@@ -154,3 +154,74 @@ python drone_simulator.py
 ```
 
 It should take a few minutes to finish, depending on the configurations in the script.
+
+### Step 4: Configure the Classifier instance (EC2-3)
+
+```bash
+# Updates package lists and upgrades all installed packages automatically
+sudo apt update && sudo apt upgrade -y
+```
+
+```bash
+# Install necessary packages like git, virtual python env, and pip
+sudo apt install -y git
+```
+
+```bash
+# Install Docker
+sudo apt update
+sudo apt install apt-transport-https ca-certificates curl software-properties-common
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+sudo apt update
+sudo apt install docker-ce
+```
+
+To verify that Docker is installed correctly, check its status:
+
+```bash
+# Verify Docker
+sudo systemctl status docker
+```
+
+You should see output that shows Docker is active and running. Press q to exit the status screen.
+
+We need to build our own docker containers that run the image classifier script:
+
+```bash
+# Clone the repo
+git clone https://github.com/daiwik-swaminathan/Drone-Simulator.git
+```
+
+```bash
+# Navigate to the appropriate directory
+cd Drone-Simulator/Classifiers
+```
+
+Modify the image classifier script (line 27) to use the IP address of the database instance. The image classifier script will not work as intended otherwise.
+
+```bash
+vi image_classifier.py
+```
+
+```bash
+# Build the container image after making the IP address change from above
+sudo docker build -t class-image .
+```
+
+The above command should take a few seconds to build the image. Once it is done, launch the 5 containers:
+
+```bash
+sudo docker run --name classifier1 -p 5000:5000 -d class-image
+sudo docker run --name classifier2 -p 5001:5000 -d class-image
+sudo docker run --name classifier3 -p 5002:5000 -d class-image
+sudo docker run --name classifier4 -p 5003:5000 -d class-image
+sudo docker run --name classifier5 -p 5004:5000 -d class-image
+```
+
+```bash
+# Stop the containers
+sudo docker stop $(sudo docker ps -q)
+```
+
+Add this script called "run_containers.sh" to the root directory of your instance:
