@@ -131,6 +131,11 @@ python3 -m venv venv
 source venv/bin/activate
 ```
 
+```bash
+# Install needed libraries
+pip install cassandra-driver
+```
+
 Modify the drone script (line 24) to use the IP address of the database instance. The drone script will not work as intended otherwise.
 Ensure that cassandra is running in the other EC2 instance. Feel free to modify the other configurations of the script to vary the workload.
 For example, to get 400 images to be in every table, you could modify the sleep statement on line 90 to be 3 seconds and modify the 
