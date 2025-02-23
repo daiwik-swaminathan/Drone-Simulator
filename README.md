@@ -131,7 +131,8 @@ python3 -m venv venv
 source venv/bin/activate
 ```
 
-Modify the drone script to use the IP address of the database instance. The drone script will not work as intended otherwise.
+Modify the drone script (line 24) to use the IP address of the database instance. The drone script will not work as intended otherwise.
+Ensure that cassandra is running in the other EC2 instance. Feel free to modify the other configurations of the script to vary the workload.
 
 ```bash
 cd Simulators
