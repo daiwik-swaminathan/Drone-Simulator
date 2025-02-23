@@ -215,12 +215,6 @@ if __name__ == "__main__":
     send_to_haproxy()
 ```
 
-Give executable perms to this script:
-
-```bash
-chmod +x push_to_haproxy.sh
-```
-
 ### Step 3: Configure the WorkloadGenerator instance (EC2-1)
 
 Run the following commands:
@@ -330,12 +324,6 @@ Modify the image classifier script (line 27) to use the IP address of the databa
 
 ```bash
 vi image_classifier.py
-```
-
-Give executable perms to `image_classifier,py`:
-
-```bash
-chmod +x image_classifier.py
 ```
 
 ```bash
