@@ -102,7 +102,54 @@ sudo docker exec -it cassandra-container cqlsh
 ```bash
 # Install HAProxy
 sudo apt update && sudo apt install haproxy -y
-# Configure HAProxy (edit /etc/haproxy/haproxy.cfg)
+```
+
+```bash
+# Start HAProxy
+sudo systemctl start haproxy
+```
+
+```bash
+# Ensure it is running
+sudo systemctl status haproxy
+```
+
+Press "q" to leave the status screen/mode.
+
+```bash
+# Open and modify HAProxy's config file:
+sudo vi /etc/haproxy/haproxy.cfg
+```
+
+In this config file add the following to the end of the file:
+
+```bash
+frontend http_front
+    bind *:8080
+    default_backend workers
+
+backend workers
+    balance leastconn
+    option http-server-close
+    option forwardfor
+
+    server worker1 <Classifier_IP>:5000
+    #server worker2 <Classifier_IP>:5001
+    #server worker3 <Classifier_IP>:5002
+    #server worker4 <Classifier_IP>:5003
+    #server worker5 <Classifier_IP>:5004
+```
+
+This will let HAProxy know about the workers (the classifier containers sitting in the Classifier instance).
+Once this has been added, make sure to restart HAProxy:
+
+```bash
+sudo systemctl restart haproxy
+```
+
+```bash
+# Ensure it is running
+sudo systemctl status haproxy
 ```
 
 ### Step 3: Configure the WorkloadGenerator instance (EC2-1)
