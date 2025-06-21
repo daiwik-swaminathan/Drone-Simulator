@@ -6,7 +6,7 @@ FLAIR is a fog-native workload placement framework designed to support low-laten
 
 The project simulates this architecture using Amazon EC2 instances for full system emulation.
 
-For more details, see the **"Experiment Setup"** chapter in the Thesis.
+For more details, see the **"Experiment Setup"** chapter in the [Thesis](https://digitalcommons.calpoly.edu/cgi/viewcontent.cgi?article=4699&context=theses)
 
 ---
 
@@ -166,4 +166,5 @@ Each `use_case_X.py` script has Discord webhook code **commented out**. If you w
 
 ## Other Notes
 
-For questions, contact: Daiwik Swaminathan
+- For questions, contact: Daiwik Swaminathan
+- For further conceptual overview, read: [Thesis](https://digitalcommons.calpoly.edu/cgi/viewcontent.cgi?article=4699&context=theses)
