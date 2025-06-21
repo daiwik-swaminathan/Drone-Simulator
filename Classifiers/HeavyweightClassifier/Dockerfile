@@ -18,4 +18,3 @@ ENV PYTHONUNBUFFERED=1
 
 # Command to run your script
 CMD ["python", "image_classifier.py"]
-

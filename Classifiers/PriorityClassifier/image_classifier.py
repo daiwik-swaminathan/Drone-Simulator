@@ -17,14 +17,16 @@ model.eval()
 
 # Define transformation pipeline for images
 transform_pipeline = transforms.Compose([
-    transforms.Resize((224, 224)),  # Resize to model's input size
+    transforms.Resize((172, 172)),  # Resize to model's input size
     transforms.ToTensor(),  # Convert to tensor
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])  # Normalization
 ])
 
+torch.set_num_threads(4)
+
 # Set up Cassandra connection
 def setup_cassandra_connection():
-    cluster = Cluster(['54.202.118.142'], port=9042)
+    cluster = Cluster(['54.190.43.40'], port=9042)
     session = cluster.connect()
     session.execute(f"USE {KEYSPACE}")
     return session
