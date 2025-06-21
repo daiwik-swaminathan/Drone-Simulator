@@ -40,26 +40,51 @@ FLAIR consists of the following nodes:
 
 ## Initial Setup
 
-1. **Get EC2 Images**
-   - You will need access to the three EC2 images:
-     - Drone Emulator Image
-     - Aggregator Image
-     - Digital Twin / Classifier Image (same AMI for all 4)
+### FLAIR AMI Setup Instructions
 
-2. **Spin Up Instances**
-   - Launch an EC2 instance from each image:
-     - 1x Drone Emulator
-     - 1x Aggregator
-     - 4x Classifier (3 for live deployment, 1 as Digital Twin)
-   - The Drone Emulator and Aggregator are `t2.large` instances.
-   - The Digital Twin and Classifier Nodes MUST all match in their instance type: `m7a.2xlarge`.
+These AMIs contain pre-configured environments for reproducing the FLAIR computing setup.
 
-3. **SSH Access**
-   - You must have your own `.pem` SSH key.
-   - Example usage:
-     ```
-     ssh -i your-key.pem ubuntu@<instance-public-ip>
-     ```
+### AMI IDs
+
+| Role            | AMI ID                      |
+|------------------|------------------------------|
+| Drone Emulator   | ami-045b470df4a52f35f        |
+| Aggregator       | ami-06284cc2a72b2ada4        |
+| Classifier Node  | ami-082b011c095328a6c        |
+
+These AMIs are **private**. To access them, please send your 12-digit AWS account ID to me. I will manually share the AMIs with your account via EC2 launch permissions.
+
+### Steps to Launch an Instance from an AMI
+
+1. Log into your AWS Console.
+2. Go to EC2 → Instances → Launch Instance.
+3. Click **Browse more AMIs**.
+4. Click the **"Shared with me"** tab.
+5. Search for the relevant AMI using the AMI ID (e.g., `ami-045b470df4a52f35f`).
+6. Choose the AMI.
+7. Select an instance type:
+   - Drone Emulator → `t2.large`
+   - Aggregator → `t2.large`
+   - Digital Twin & Classifier Nodes → `m7a.2xlarge` (REQUIRED)
+8. Configure the instance as needed:
+   - Open security group ports (use perms from 410)
+   - Set appropriate storage (default is OK)
+   - Choose an SSH key pair (you must have your own `.pem` file)
+9. Click **Launch**.
+
+Repeat this process for:
+- One Drone Emulator instance
+- One Aggregator instance
+- Four Classifier Nodes (3 for live deployment, 1 for digital twin)
+
+### SSH Access
+
+You will need to use your own `.pem` key file to connect to each instance.
+
+Example:
+```
+ssh -i your-key.pem ubuntu@<public-ip>
+```
 
 ---
 
